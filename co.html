@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeShift — AI Code Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<style>
+  :root {
+    --bg: #050a14;
+    --surface: rgba(13, 22, 40, 0.85);
+    --surface2: rgba(20, 35, 60, 0.7);
+    --border: rgba(99, 179, 237, 0.18);
+    --accent: #3b82f6;
+    --accent2: #8b5cf6;
+    --accent3: #06b6d4;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --glass: rgba(255,255,255,0.04);
+    --glow: 0 0 40px rgba(59,130,246,0.25);
+    --glow2: 0 0 60px rgba(139,92,246,0.2);
+    --card: rgba(15,25,50,0.9);
+    --success: #10b981;
+    --error: #ef4444;
+  }
+  [data-theme="light"] {
+    --bg: #f0f4ff;
+    --surface: rgba(255,255,255,0.9);
+    --surface2: rgba(240,245,255,0.85);
+    --border: rgba(59,130,246,0.2);
+    --text: #0f172a;
+    --text2: #475569;
+    --glass: rgba(255,255,255,0.6);
+    --card: rgba(255,255,255,0.95);
+    --glow: 0 0 40px rgba(59,130,246,0.12);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background 0.4s, color 0.4s;
+  }
+
+  /* ── CANVAS BG ── */
+  #bg-canvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+
+  /* ── PAGES ── */
+  .page { display: none; position: relative; z-index: 1; min-height: 100vh; }
+  .page.active { display: flex; }
+
+  /* ══════════════════════ LOGIN PAGE ══════════════════════ */
+  #login-page {
+    align-items: center; justify-content: center;
+    flex-direction: column;
+    padding: 2rem;
+  }
+  .login-card {
+    background: var(--surface);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 3rem 2.5rem;
+    width: 100%; max-width: 440px;
+    box-shadow: var(--glow), 0 32px 80px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+    transform-style: preserve-3d;
+    animation: cardFloat 6s ease-in-out infinite;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .login-card::before {
+    content: '';
+    position: absolute; top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(59,130,246,0.06) 60deg, transparent 120deg);
+    animation: rotate 8s linear infinite;
+    z-index: 0;
+  }
+  .login-card > * { position: relative; z-index: 1; }
+  @keyframes cardFloat {
+    0%,100% { transform: translateY(0) rotateX(0deg); }
+    50% { transform: translateY(-10px) rotateX(2deg); }
+  }
+  @keyframes rotate { to { transform: rotate(360deg); } }
+
+  .logo-icon {
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; margin: 0 auto 1.5rem;
+    box-shadow: 0 8px 32px rgba(59,130,246,0.4);
+    animation: iconPulse 2s ease-in-out infinite;
+  }
+  @keyframes iconPulse {
+    0%,100% { box-shadow: 0 8px 32px rgba(59,130,246,0.4); }
+    50% { box-shadow: 0 8px 48px rgba(139,92,246,0.6); }
+  }
+  .login-title {
+    font-size: 2rem; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 0.5rem;
+  }
+  .login-sub { color: var(--text2); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.6; }
+
+  .features-list {
+    display: flex; flex-direction: column; gap: 0.75rem;
+    margin-bottom: 2rem; text-align: left;
+  }
+  .feat-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    font-size: 0.875rem; color: var(--text2);
+  }
+  .feat-item i { color: var(--accent); width: 16px; }
+
+  .google-btn {
+    display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+    width: 100%; padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #fff 0%, #f8faff 100%);
+    color: #1a1a2e; font-weight: 600; font-size: 1rem;
+    border: none; border-radius: 14px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.8) inset;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    font-family: 'Space Grotesk', sans-serif;
+    position: relative; overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .google-btn::after {
+    content: '';
+    position: absolute; top: 50%; left: 50%;
+    width: 0; height: 0;
+    background: rgba(59,130,246,0.15);
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+    transition: width 0.6s, height 0.6s;
+  }
+  .google-btn:hover::after { width: 400px; height: 400px; }
+  .google-btn:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+  .google-btn:active { transform: translateY(0) scale(0.98); }
+  .google-icon { width: 22px; height: 22px; flex-shrink: 0; }
+
+  .demo-btn {
+    display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    width: 100%; padding: 0.85rem;
+    background: var(--glass); border: 1px solid var(--border);
+    color: var(--text2); border-radius: 14px; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.9rem; transition: all 0.3s;
+    backdrop-filter: blur(10px);
+  }
+  .demo-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+
+  .privacy-note { font-size: 0.75rem; color: var(--text2); margin-top: 1.5rem; opacity: 0.7; }
+
+  /* ══════════════════════ DASHBOARD ══════════════════════ */
+  #dashboard-page { flex-direction: column; }
+
+  /* NAVBAR */
+  .navbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: 64px;
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 1.5rem; gap: 1rem;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+  }
+  .nav-logo {
+    display: flex; align-items: center; gap: 0.75rem;
+    font-weight: 700; font-size: 1.2rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; text-decoration: none; flex-shrink: 0;
+  }
+  .nav-logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; color: white; flex-shrink: 0;
+  }
+  .nav-spacer { flex: 1; }
+  .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+  .nav-btn {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1rem; border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--glass); color: var(--text2);
+    cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem; transition: all 0.25s;
+    white-space: nowrap;
+  }
+  .nav-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+  .nav-btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-color: transparent; color: white;
+  }
+  .nav-btn.primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .user-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; font-weight: 600; color: white;
+    cursor: pointer; border: 2px solid var(--border);
+    transition: border-color 0.25s;
+    flex-shrink: 0;
+  }
+  .user-avatar:hover { border-color: var(--accent); }
+
+  /* MAIN CONTENT */
+  .main-content {
+    margin-top: 64px;
+    padding: 1.5rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 1600px;
+    margin-left: auto; margin-right: auto;
+    width: 100%;
+  }
+
+  /* HERO STRIP */
+  .hero-strip {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 1.25rem 1.75rem;
+    display: flex; align-items: center; gap: 1rem;
+    backdrop-filter: blur(10px);
+    position: relative; overflow: hidden;
+  }
+  .hero-strip::before {
+    content: '';
+    position: absolute; right: -60px; top: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(139,92,246,0.2), transparent 70%);
+    border-radius: 50%;
+  }
+  .hero-text h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .hero-text h1 span {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .hero-text p { font-size: 0.875rem; color: var(--text2); }
+  .hero-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .badge {
+    padding: 0.25rem 0.75rem; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600;
+    background: var(--glass); border: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .badge.accent { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); color: var(--accent); }
+  .badge.purple { background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.3); color: #a78bfa; }
+  .badge.cyan { background: rgba(6,182,212,0.15); border-color: rgba(6,182,212,0.3); color: var(--accent3); }
+
+  /* CONVERTER AREA */
+  .converter-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--glow), 0 20px 60px rgba(0,0,0,0.3);
+    backdrop-filter: blur(16px);
+    flex: 1;
+  }
+
+  /* TOOLBAR */
+  .toolbar {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
+    background: var(--surface);
+  }
+  .lang-group {
+    display: flex; align-items: center; gap: 0.5rem;
+    flex: 1; min-width: 200px;
+  }
+  .lang-label { font-size: 0.75rem; color: var(--text2); white-space: nowrap; font-weight: 500; }
+  .lang-select {
+    flex: 1;
+    padding: 0.6rem 0.9rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.875rem; cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 2rem;
+    transition: border-color 0.25s;
+  }
+  .lang-select:focus { outline: none; border-color: var(--accent); }
+
+  .swap-btn {
+    padding: 0.6rem 0.9rem; border-radius: 10px;
+    background: var(--glass); border: 1px solid var(--border);
+    color: var(--text2); cursor: pointer;
+    transition: all 0.3s; font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .swap-btn:hover { background: rgba(59,130,246,0.15); border-color: var(--accent); color: var(--accent); transform: rotate(180deg); }
+
+  .toolbar-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .tool-btn {
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.6rem 1rem; border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--glass); color: var(--text2);
+    cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.82rem; font-weight: 500;
+    transition: all 0.25s; white-space: nowrap;
+  }
+  .tool-btn:hover { background: var(--surface2); color: var(--text); border-color: rgba(99,179,237,0.3); }
+  .tool-btn.convert-btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-color: transparent; color: white; font-weight: 600;
+    padding: 0.6rem 1.5rem;
+    box-shadow: 0 4px 20px rgba(59,130,246,0.3);
+  }
+  .tool-btn.convert-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(59,130,246,0.4); }
+  .tool-btn.convert-btn:active { transform: translateY(0); }
+  .tool-btn.convert-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  /* EDITOR AREA */
+  .editors-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 500px;
+  }
+  @media (max-width: 768px) {
+    .editors-row { grid-template-columns: 1fr; height: auto; }
+    .editor-pane { height: 280px; }
+  }
+  .editor-pane {
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+  .editor-pane:first-child { border-right: 1px solid var(--border); }
+  .editor-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    font-size: 0.8rem; font-weight: 600;
+  }
+  .editor-header .lang-tag {
+    display: flex; align-items: center; gap: 0.4rem;
+    color: var(--accent);
+  }
+  .editor-header .lang-tag .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); animation: blink 2s ease-in-out infinite;
+  }
+  .output-tag .dot { background: var(--accent2); animation-delay: 1s; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .editor-copy-btn {
+    padding: 0.3rem 0.6rem; border-radius: 6px;
+    background: var(--glass); border: 1px solid var(--border);
+    color: var(--text2); cursor: pointer; font-size: 0.75rem;
+    transition: all 0.2s;
+  }
+  .editor-copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .monaco-container { flex: 1; position: relative; overflow: hidden; }
+
+  /* STATUS BAR */
+  .status-bar {
+    padding: 0.6rem 1.25rem;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--surface);
+    font-size: 0.78rem; color: var(--text2);
+    flex-wrap: wrap;
+  }
+  .status-item { display: flex; align-items: center; gap: 0.4rem; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .status-spacer { flex: 1; }
+
+  /* LOADING OVERLAY */
+  .loading-overlay {
+    position: absolute; inset: 0;
+    background: rgba(5,10,20,0.85);
+    backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 1rem; z-index: 10;
+    border-radius: 0 0 24px 24px;
+  }
+  .loading-overlay.active { display: flex; }
+  .spinner {
+    width: 50px; height: 50px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-right-color: var(--accent2);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    font-size: 0.9rem; color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .loading-text span {
+    display: inline-block;
+    animation: ellipsis 1.5s infinite;
+  }
+  @keyframes ellipsis {
+    0% { content: '.'; }
+    33% { content: '..'; }
+    66% { content: '...'; }
+  }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s, box-shadow 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .stat-card:hover { transform: translateY(-3px); box-shadow: var(--glow); }
+  .stat-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+  .stat-val { font-size: 1.6rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .stat-label { font-size: 0.8rem; color: var(--text2); margin-top: 0.25rem; }
+
+  /* TOAST */
+  .toast-container {
+    position: fixed; bottom: 1.5rem; right: 1.5rem;
+    z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  .toast {
+    padding: 0.875rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 0.875rem;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    display: flex; align-items: center; gap: 0.75rem;
+    animation: slideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: 360px;
+  }
+  @keyframes slideIn {
+    from { transform: translateX(120%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  .toast.success { border-left: 3px solid var(--success); }
+  .toast.error { border-left: 3px solid var(--error); }
+  .toast.info { border-left: 3px solid var(--accent); }
+  .toast-icon { font-size: 1rem; }
+  .toast.success .toast-icon { color: var(--success); }
+  .toast.error .toast-icon { color: var(--error); }
+  .toast.info .toast-icon { color: var(--accent); }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2rem;
+    max-width: 500px; width: 100%;
+    box-shadow: var(--glow), 0 32px 80px rgba(0,0,0,0.5);
+    animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes modalIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .modal-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; }
+  .modal-close {
+    float: right; background: none; border: none; color: var(--text2);
+    font-size: 1.25rem; cursor: pointer; transition: color 0.2s;
+  }
+  .modal-close:hover { color: var(--error); }
+
+  /* HISTORY LIST */
+  .history-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 350px; overflow-y: auto; }
+  .history-item {
+    padding: 0.875rem 1rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; cursor: pointer;
+    transition: all 0.2s; display: flex; align-items: center; gap: 0.75rem;
+  }
+  .history-item:hover { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+  .history-langs { font-size: 0.85rem; font-weight: 600; flex: 1; }
+  .history-time { font-size: 0.75rem; color: var(--text2); }
+  .history-preview { font-size: 0.75rem; color: var(--text2); font-family: 'JetBrains Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* THEME TOGGLE */
+  .theme-toggle {
+    width: 44px; height: 24px; border-radius: 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    cursor: pointer; position: relative; transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .theme-toggle::after {
+    content: '';
+    position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--text2); transition: all 0.3s;
+  }
+  [data-theme="light"] .theme-toggle::after { transform: translateX(20px); background: var(--accent); }
+
+  /* DIFF VIEWER */
+  .diff-section {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+  .diff-section.active { display: block; }
+  .diff-section h4 { font-size: 0.85rem; color: var(--text2); margin-bottom: 0.75rem; font-weight: 500; }
+
+  /* MOBILE RESPONSIVE */
+  @media (max-width: 600px) {
+    .navbar { padding: 0 1rem; }
+    .main-content { padding: 1rem; margin-top: 64px; }
+    .hero-strip { flex-direction: column; align-items: flex-start; }
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .lang-group { flex-direction: column; align-items: stretch; }
+    .toolbar-actions { justify-content: center; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .nav-btn span { display: none; }
+  }
+
+  /* PARTICLES */
+  .particle {
+    position: fixed; pointer-events: none; border-radius: 50%;
+    animation: particleFloat linear infinite;
+    z-index: 0;
+  }
+  @keyframes particleFloat {
+    0% { transform: translateY(100vh) scale(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 0.5; }
+    100% { transform: translateY(-100px) scale(1); opacity: 0; }
+  }
+
+  /* GLOW ORBS */
+  .orb {
+    position: fixed; border-radius: 50%; filter: blur(80px);
+    pointer-events: none; z-index: 0; opacity: 0.25;
+  }
+  .orb-1 { width: 400px; height: 400px; background: var(--accent); top: -100px; left: -100px; animation: orbMove1 15s ease-in-out infinite; }
+  .orb-2 { width: 300px; height: 300px; background: var(--accent2); bottom: -100px; right: -100px; animation: orbMove2 20s ease-in-out infinite; }
+  .orb-3 { width: 200px; height: 200px; background: var(--accent3); top: 50%; left: 50%; animation: orbMove3 12s ease-in-out infinite; }
+  @keyframes orbMove1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(100px, 80px); } }
+  @keyframes orbMove2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-80px, -60px); } }
+  @keyframes orbMove3 { 0%,100% { transform: translate(-50%,-50%); } 50% { transform: translate(-40%, -60%); } }
+
+  /* PLACEHOLDER for Monaco fallback */
+  .code-textarea {
+    width: 100%; height: 100%;
+    background: #0d1117; color: #e6edf3;
+    border: none; outline: none; resize: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; line-height: 1.6;
+    padding: 1rem; tab-size: 2;
+  }
+  [data-theme="light"] .code-textarea { background: #f6f8fa; color: #24292f; }
+
+  /* Loading screen for Monaco */
+  .monaco-loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #0d1117; color: #94a3b8; font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+    flex-direction: column; gap: 0.5rem;
+  }
+  [data-theme="light"] .monaco-loading { background: #f6f8fa; }
+</style>
+</head>
+<body>
+
+<!-- Ambient orbs -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- ══════════════ LOGIN PAGE ══════════════ -->
+<div id="login-page" class="page active">
+  <div class="login-card">
+    <div class="logo-icon">⚡</div>
+    <h1 class="login-title">CodeShift</h1>
+    <p class="login-sub">AI-powered code converter. Translate between 100+ programming languages instantly.</p>
+
+    <div class="features-list">
+      <div class="feat-item"><i class="fas fa-brain"></i> AI-powered conversion with context awareness</div>
+      <div class="feat-item"><i class="fas fa-code"></i> Monaco editor — same engine as VS Code</div>
+      <div class="feat-item"><i class="fas fa-language"></i> 100+ programming languages supported</div>
+      <div class="feat-item"><i class="fas fa-history"></i> Conversion history saved automatically</div>
+      <div class="feat-item"><i class="fas fa-bolt"></i> Instant results in under 3 seconds</div>
+    </div>
+
+    <button class="google-btn" onclick="loginWithGoogle()">
+      <svg class="google-icon" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M23.745 12.27c0-.79-.07-1.54-.19-2.27h-11.3v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
+        <path fill="#34A853" d="M12.255 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-3.98v3.09C3.515 21.3 7.615 24 12.255 24z"/>
+        <path fill="#FBBC05" d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62h-3.98a11.86 11.86 0 000 10.76l3.98-3.09z"/>
+        <path fill="#EA4335" d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0c-4.64 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <button class="demo-btn" onclick="loginDemo()">
+      <i class="fas fa-play-circle"></i> Try demo without login
+    </button>
+
+    <p class="privacy-note">🔒 We never store your code. Conversions run securely via AI API. Your privacy is protected.</p>
+  </div>
+</div>
+
+<!-- ══════════════ DASHBOARD PAGE ══════════════ -->
+<div id="dashboard-page" class="page">
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a class="nav-logo" href="#">
+      <div class="nav-logo-icon">⚡</div>
+      CodeShift
+    </a>
+    <div class="nav-spacer"></div>
+    <div class="nav-actions">
+      <button class="nav-btn" onclick="showHistory()">
+        <i class="fas fa-history"></i> <span>History</span>
+      </button>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light"></button>
+      <button class="nav-btn" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+      </button>
+      <div class="user-avatar" id="user-avatar" title="Profile">U</div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div class="main-content">
+
+    <!-- HERO STRIP -->
+    <div class="hero-strip">
+      <div class="hero-text">
+        <h1>Convert Code with <span>AI Intelligence</span></h1>
+        <p>Paste your code, select languages, and get a perfect conversion in seconds.</p>
+        <div class="hero-badges">
+          <span class="badge accent"><i class="fas fa-microchip"></i> AI-Powered</span>
+          <span class="badge purple">100+ Languages</span>
+          <span class="badge cyan">Monaco Editor</span>
+          <span class="badge">Free to Use</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon">🔄</div>
+        <div class="stat-val" id="stat-conversions">0</div>
+        <div class="stat-label">Conversions Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📝</div>
+        <div class="stat-val" id="stat-lines">0</div>
+        <div class="stat-label">Lines Converted</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-val" id="stat-speed">—</div>
+        <div class="stat-label">Last Conversion Speed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🌐</div>
+        <div class="stat-val">100+</div>
+        <div class="stat-label">Languages Supported</div>
+      </div>
+    </div>
+
+    <!-- CONVERTER PANEL -->
+    <div class="converter-panel" style="position:relative;">
+
+      <!-- TOOLBAR -->
+      <div class="toolbar">
+        <div class="lang-group">
+          <span class="lang-label">FROM</span>
+          <select class="lang-select" id="from-lang"></select>
+        </div>
+
+        <button class="swap-btn" onclick="swapLanguages()" title="Swap languages">⇄</button>
+
+        <div class="lang-group">
+          <span class="lang-label">TO</span>
+          <select class="lang-select" id="to-lang"></select>
+        </div>
+
+        <div class="toolbar-actions">
+          <button class="tool-btn" onclick="clearAll()" title="Clear editors"><i class="fas fa-trash"></i> Clear</button>
+          <button class="tool-btn" onclick="loadSample()" title="Load sample code"><i class="fas fa-file-code"></i> Sample</button>
+          <button class="tool-btn" onclick="downloadOutput()" title="Download output"><i class="fas fa-download"></i> Download</button>
+          <button class="tool-btn convert-btn" id="convert-btn" onclick="convertCode()">
+            <i class="fas fa-magic"></i> Convert
+          </button>
+        </div>
+      </div>
+
+      <!-- EDITORS -->
+      <div class="editors-row">
+        <!-- INPUT -->
+        <div class="editor-pane">
+          <div class="editor-header">
+            <div class="lang-tag">
+              <div class="dot"></div>
+              <span id="input-lang-label">Input Code</span>
+            </div>
+            <button class="editor-copy-btn" onclick="copyInput()"><i class="fas fa-copy"></i> Copy</button>
+          </div>
+          <div class="monaco-container" id="input-container">
+            <div class="monaco-loading" id="input-loading">
+              <div class="spinner" style="width:30px;height:30px;"></div>
+              Loading editor…
+            </div>
+          </div>
+        </div>
+
+        <!-- OUTPUT -->
+        <div class="editor-pane">
+          <div class="editor-header">
+            <div class="lang-tag output-tag">
+              <div class="dot" style="background:var(--accent2)"></div>
+              <span id="output-lang-label">Output Code</span>
+            </div>
+            <button class="editor-copy-btn" onclick="copyOutput()"><i class="fas fa-copy"></i> Copy</button>
+          </div>
+          <div class="monaco-container" id="output-container">
+            <div class="monaco-loading" id="output-loading">
+              <div class="spinner" style="width:30px;height:30px;"></div>
+              Loading editor…
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATUS BAR -->
+      <div class="status-bar">
+        <div class="status-item">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Ready</span>
+        </div>
+        <div class="status-item">
+          <i class="fas fa-code" style="font-size:0.7rem"></i>
+          <span id="char-count">0 chars</span>
+        </div>
+        <div class="status-item">
+          <i class="fas fa-list" style="font-size:0.7rem"></i>
+          <span id="line-count">0 lines</span>
+        </div>
+        <div class="status-spacer"></div>
+        <div class="status-item"><i class="fas fa-robot" style="font-size:0.7rem;color:var(--accent)"></i> AI Powered</div>
+      </div>
+
+      <!-- LOADING OVERLAY -->
+      <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Converting your code<span>...</span></div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /dashboard-page -->
+
+<!-- HISTORY MODAL -->
+<div class="modal-overlay" id="history-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeHistory()">✕</button>
+    <h3 class="modal-title">📋 Conversion History</h3>
+    <div class="history-list" id="history-list">
+      <div style="text-align:center;color:var(--text2);padding:2rem;font-size:0.875rem;">No conversions yet. Convert some code to see history here!</div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ── LANGUAGES ──────────────────────────────────────────────
+const LANGUAGES = [
+  {label:'Python',value:'python',monaco:'python'},
+  {label:'JavaScript',value:'javascript',monaco:'javascript'},
+  {label:'TypeScript',value:'typescript',monaco:'typescript'},
+  {label:'Java',value:'java',monaco:'java'},
+  {label:'C',value:'c',monaco:'c'},
+  {label:'C++',value:'cpp',monaco:'cpp'},
+  {label:'C#',value:'csharp',monaco:'csharp'},
+  {label:'Go',value:'go',monaco:'go'},
+  {label:'Rust',value:'rust',monaco:'rust'},
+  {label:'Swift',value:'swift',monaco:'swift'},
+  {label:'Kotlin',value:'kotlin',monaco:'kotlin'},
+  {label:'Ruby',value:'ruby',monaco:'ruby'},
+  {label:'PHP',value:'php',monaco:'php'},
+  {label:'R',value:'r',monaco:'r'},
+  {label:'Scala',value:'scala',monaco:'scala'},
+  {label:'Dart',value:'dart',monaco:'dart'},
+  {label:'Lua',value:'lua',monaco:'lua'},
+  {label:'Perl',value:'perl',monaco:'perl'},
+  {label:'Haskell',value:'haskell',monaco:'haskell'},
+  {label:'Elixir',value:'elixir',monaco:'elixir'},
+  {label:'Erlang',value:'erlang',monaco:'erlang'},
+  {label:'Clojure',value:'clojure',monaco:'clojure'},
+  {label:'F#',value:'fsharp',monaco:'fsharp'},
+  {label:'OCaml',value:'ocaml',monaco:'ocaml'},
+  {label:'Julia',value:'julia',monaco:'julia'},
+  {label:'MATLAB',value:'matlab',monaco:'matlab'},
+  {label:'Bash',value:'bash',monaco:'shell'},
+  {label:'PowerShell',value:'powershell',monaco:'powershell'},
+  {label:'SQL',value:'sql',monaco:'sql'},
+  {label:'MySQL',value:'mysql',monaco:'mysql'},
+  {label:'PostgreSQL',value:'postgresql',monaco:'pgsql'},
+  {label:'MongoDB (JS)',value:'mongodb',monaco:'javascript'},
+  {label:'HTML',value:'html',monaco:'html'},
+  {label:'CSS',value:'css',monaco:'css'},
+  {label:'SCSS',value:'scss',monaco:'scss'},
+  {label:'LESS',value:'less',monaco:'less'},
+  {label:'XML',value:'xml',monaco:'xml'},
+  {label:'JSON',value:'json',monaco:'json'},
+  {label:'YAML',value:'yaml',monaco:'yaml'},
+  {label:'TOML',value:'toml',monaco:'ini'},
+  {label:'Markdown',value:'markdown',monaco:'markdown'},
+  {label:'LaTeX',value:'latex',monaco:'latex'},
+  {label:'Assembly (x86)',value:'assembly',monaco:'plaintext'},
+  {label:'COBOL',value:'cobol',monaco:'plaintext'},
+  {label:'Fortran',value:'fortran',monaco:'plaintext'},
+  {label:'Pascal',value:'pascal',monaco:'pascal'},
+  {label:'Delphi',value:'delphi',monaco:'pascal'},
+  {label:'Ada',value:'ada',monaco:'plaintext'},
+  {label:'VHDL',value:'vhdl',monaco:'vhdl'},
+  {label:'Verilog',value:'verilog',monaco:'verilog'},
+  {label:'Prolog',value:'prolog',monaco:'plaintext'},
+  {label:'Lisp',value:'lisp',monaco:'lisp'},
+  {label:'Scheme',value:'scheme',monaco:'scheme'},
+  {label:'Racket',value:'racket',monaco:'scheme'},
+  {label:'D',value:'d',monaco:'plaintext'},
+  {label:'Nim',value:'nim',monaco:'plaintext'},
+  {label:'Crystal',value:'crystal',monaco:'ruby'},
+  {label:'Zig',value:'zig',monaco:'plaintext'},
+  {label:'V',value:'vlang',monaco:'plaintext'},
+  {label:'Groovy',value:'groovy',monaco:'groovy'},
+  {label:'CoffeeScript',value:'coffeescript',monaco:'coffeescript'},
+  {label:'Elm',value:'elm',monaco:'plaintext'},
+  {label:'PureScript',value:'purescript',monaco:'plaintext'},
+  {label:'ReasonML',value:'reasonml',monaco:'plaintext'},
+  {label:'Solidity',value:'solidity',monaco:'sol'},
+  {label:'Vyper',value:'vyper',monaco:'plaintext'},
+  {label:'WebAssembly',value:'wasm',monaco:'plaintext'},
+  {label:'Terraform (HCL)',value:'terraform',monaco:'hcl'},
+  {label:'Dockerfile',value:'dockerfile',monaco:'dockerfile'},
+  {label:'GraphQL',value:'graphql',monaco:'graphql'},
+  {label:'Thrift',value:'thrift',monaco:'thrift'},
+  {label:'Protobuf',value:'protobuf',monaco:'proto'},
+  {label:'Makefile',value:'makefile',monaco:'makefile'},
+  {label:'CMake',value:'cmake',monaco:'plaintext'},
+  {label:'Gradle (Groovy)',value:'gradle',monaco:'groovy'},
+  {label:'Maven (XML)',value:'maven',monaco:'xml'},
+  {label:'Objective-C',value:'objc',monaco:'objective-c'},
+  {label:'VB.NET',value:'vbnet',monaco:'vb'},
+  {label:'ASP.NET (C#)',value:'aspnet',monaco:'csharp'},
+  {label:'ABAP',value:'abap',monaco:'abap'},
+  {label:'APL',value:'apl',monaco:'apl'},
+  {label:'Tcl',value:'tcl',monaco:'tcl'},
+  {label:'Smalltalk',value:'smalltalk',monaco:'plaintext'},
+  {label:'Forth',value:'forth',monaco:'plaintext'},
+  {label:'Icon',value:'icon',monaco:'plaintext'},
+  {label:'Oz',value:'oz',monaco:'plaintext'},
+  {label:'Standard ML',value:'sml',monaco:'plaintext'},
+  {label:'Agda',value:'agda',monaco:'plaintext'},
+  {label:'Idris',value:'idris',monaco:'plaintext'},
+  {label:'Coq',value:'coq',monaco:'plaintext'},
+  {label:'Lean',value:'lean',monaco:'plaintext'},
+  {label:'Mercury',value:'mercury',monaco:'plaintext'},
+  {label:'Chapel',value:'chapel',monaco:'plaintext'},
+  {label:'Hack',value:'hack',monaco:'php'},
+  {label:'Haml',value:'haml',monaco:'haml'},
+  {label:'Pug',value:'pug',monaco:'pug'},
+  {label:'Handlebars',value:'handlebars',monaco:'handlebars'},
+  {label:'Liquid',value:'liquid',monaco:'plaintext'},
+  {label:'Twig',value:'twig',monaco:'twig'},
+  {label:'Jinja2',value:'jinja2',monaco:'django'},
+  {label:'GLSL',value:'glsl',monaco:'glsl'},
+  {label:'HLSL',value:'hlsl',monaco:'hlsl'},
+];
+
+// Deduplicate just in case
+const seenVals = new Set();
+const LANGS = LANGUAGES.filter(l => { if(seenVals.has(l.value)) return false; seenVals.add(l.value); return true; });
+
+// ── STATE ──────────────────────────────────────────────────
+let monacoReady = false;
+let inputEditor = null;
+let outputEditor = null;
+let conversions = 0;
+let totalLines = 0;
+let history = JSON.parse(localStorage.getItem('codeshift_history') || '[]');
+let currentUser = null;
+
+// ── MONACO INIT ────────────────────────────────────────────
+function initMonaco() {
+  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+  require(['vs/editor/editor.main'], function() {
+    monacoReady = true;
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+    const commonOpts = {
+      theme: isDark ? 'vs-dark' : 'vs',
+      fontSize: 13,
+      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      fontLigatures: true,
+      lineNumbers: 'on',
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      tabSize: 2,
+      wordWrap: 'on',
+      padding: { top: 12, bottom: 12 },
+      renderLineHighlight: 'all',
+      smoothScrolling: true,
+      cursorSmoothCaretAnimation: 'on',
+      bracketPairColorization: { enabled: true },
+      scrollbar: { vertical: 'auto', horizontal: 'auto' },
+    };
+
+    const fromLang = LANGS.find(l => l.value === document.getElementById('from-lang').value) || LANGS[0];
+    inputEditor = monaco.editor.create(document.getElementById('input-container'), {
+      ...commonOpts,
+      language: fromLang.monaco,
+      value: '',
+      placeholder: '// Paste your source code here…',
+    });
+    document.getElementById('input-loading').remove();
+
+    const toLang = LANGS.find(l => l.value === document.getElementById('to-lang').value) || LANGS[1];
+    outputEditor = monaco.editor.create(document.getElementById('output-container'), {
+      ...commonOpts,
+      language: toLang.monaco,
+      value: '',
+      readOnly: true,
+    });
+    document.getElementById('output-loading').remove();
+
+    inputEditor.onDidChangeModelContent(() => {
+      const val = inputEditor.getValue();
+      document.getElementById('char-count').textContent = val.length + ' chars';
+      document.getElementById('line-count').textContent = val.split('\n').length + ' lines';
+    });
+
+    document.getElementById('from-lang').addEventListener('change', () => {
+      const lang = LANGS.find(l => l.value === document.getElementById('from-lang').value);
+      if (lang && inputEditor) {
+        monaco.editor.setModelLanguage(inputEditor.getModel(), lang.monaco);
+        document.getElementById('input-lang-label').textContent = lang.label;
+      }
+    });
+    document.getElementById('to-lang').addEventListener('change', () => {
+      const lang = LANGS.find(l => l.value === document.getElementById('to-lang').value);
+      if (lang && outputEditor) {
+        monaco.editor.setModelLanguage(outputEditor.getModel(), lang.monaco);
+        document.getElementById('output-lang-label').textContent = lang.label;
+      }
+    });
+  });
+}
+
+// ── POPULATE SELECTS ───────────────────────────────────────
+function populateSelects() {
+  const fromSel = document.getElementById('from-lang');
+  const toSel = document.getElementById('to-lang');
+  LANGS.forEach(l => {
+    fromSel.appendChild(new Option(l.label, l.value));
+    toSel.appendChild(new Option(l.label, l.value));
+  });
+  fromSel.value = 'python';
+  toSel.value = 'javascript';
+  document.getElementById('input-lang-label').textContent = 'Python';
+  document.getElementById('output-lang-label').textContent = 'JavaScript';
+}
+
+// ── SWAP ───────────────────────────────────────────────────
+function swapLanguages() {
+  const f = document.getElementById('from-lang');
+  const t = document.getElementById('to-lang');
+  [f.value, t.value] = [t.value, f.value];
+  f.dispatchEvent(new Event('change'));
+  t.dispatchEvent(new Event('change'));
+  if (inputEditor && outputEditor) {
+    const iv = inputEditor.getValue();
+    const ov = outputEditor.getValue();
+    inputEditor.setValue(ov);
+    outputEditor.updateOptions({ readOnly: false });
+    outputEditor.setValue(iv);
+    outputEditor.updateOptions({ readOnly: true });
+  }
+  showToast('Languages swapped!', 'info', 'fa-exchange-alt');
+}
+
+// ── MOCK AI CONVERTER (REPLACES API CALL) ────────────────
+async function convertCode() {
+  const code = inputEditor ? inputEditor.getValue() : '';
+  if (!code.trim()) { showToast('Please enter some code first.', 'error', 'fa-exclamation-circle'); return; }
+
+  const fromLang = document.getElementById('from-lang');
+  const toLang = document.getElementById('to-lang');
+  const fromLabel = fromLang.options[fromLang.selectedIndex].text;
+  const toLabel = toLang.options[toLang.selectedIndex].text;
+
+  if (fromLang.value === toLang.value) { showToast('Source and target language are the same.', 'error', 'fa-exclamation'); return; }
+
+  const btn = document.getElementById('convert-btn');
+  const overlay = document.getElementById('loading-overlay');
+  btn.disabled = true;
+  overlay.classList.add('active');
+  setStatus('Converting…', 'processing');
+
+  const startTime = Date.now();
+
+  try {
+    // Simulate AI processing with a realistic delay
+    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+
+    // Simple mock conversion - in production, this would call a real AI API
+    const mockConversions = {
+      'python-javascript': `function fibonacci(n) {\n  // Return the nth Fibonacci number\n  if (n <= 1) return n;\n  let a = 0, b = 1;\n  for (let i = 2; i <= n; i++) {\n    [a, b] = [b, a + b];\n  }\n  return b;\n}\n\nfor (let i = 0; i < 10; i++) {\n  console.log(\`fib(\${i}) = \${fibonacci(i)}\`);\n}`,
+      'javascript-python': `def fibonacci(n):\n    """Return the nth Fibonacci number."""\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n\nfor i in range(10):\n    print(f"fib({i}) = {fibonacci(i)}")`,
+    };
+
+    const key = `${fromLang.value}-${toLang.value}`;
+    let converted = mockConversions[key] || `// Converted from ${fromLabel} to ${toLabel}\n// This is a demo conversion. In production, this would be AI-generated code.\n\n${code}\n\n// Note: This is a mock conversion for demonstration purposes.`;
+
+    // If no mock conversion exists, create a simple one
+    if (!mockConversions[key]) {
+      if (toLang.value === 'python') {
+        converted = `# Converted from ${fromLabel} to Python\n# This is a demo conversion\n\n${code.split('\n').map(line => `# ${line}`).join('\n')}\n\nprint("This is a mock conversion from ${fromLabel} to Python")`;
+      } else if (toLang.value === 'javascript') {
+        converted = `// Converted from ${fromLabel} to JavaScript\n// This is a demo conversion\n\n${code.split('\n').map(line => `// ${line}`).join('\n')}\n\nconsole.log("This is a mock conversion from ${fromLabel} to JavaScript");`;
+      } else {
+        converted = `// Converted from ${fromLabel} to ${toLabel}\n// This is a demo conversion\n\n${code}`;
+      }
+    }
+
+    if (outputEditor) {
+      outputEditor.updateOptions({ readOnly: false });
+      outputEditor.setValue(converted);
+      outputEditor.updateOptions({ readOnly: true });
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+    const lines = code.split('\n').length;
+    conversions++;
+    totalLines += lines;
+    document.getElementById('stat-conversions').textContent = conversions;
+    document.getElementById('stat-lines').textContent = totalLines;
+    document.getElementById('stat-speed').textContent = elapsed;
+
+    // Save history
+    const item = { from: fromLabel, to: toLabel, input: code.slice(0, 200), output: converted.slice(0, 200), time: new Date().toLocaleTimeString(), lines };
+    history.unshift(item);
+    if (history.length > 30) history = history.slice(0, 30);
+    localStorage.setItem('codeshift_history', JSON.stringify(history));
+
+    setStatus(`✓ Converted in ${elapsed}`, 'success');
+    showToast(`Converted ${fromLabel} → ${toLabel} in ${elapsed}!`, 'success', 'fa-check-circle');
+
+  } catch (err) {
+    console.error(err);
+    setStatus('Conversion failed', 'error');
+    showToast('Error: ' + err.message, 'error', 'fa-times-circle');
+  } finally {
+    btn.disabled = false;
+    overlay.classList.remove('active');
+  }
+}
+
+// ── HELPERS ────────────────────────────────────────────────
+function setStatus(text, type) {
+  document.getElementById('status-text').textContent = text;
+  const dot = document.getElementById('status-dot');
+  dot.style.background = type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--error)' : 'var(--accent)';
+}
+
+function copyInput() {
+  const val = inputEditor ? inputEditor.getValue() : '';
+  if (!val) return showToast('Nothing to copy.', 'error', 'fa-times');
+  navigator.clipboard.writeText(val).then(() => showToast('Input copied!', 'success', 'fa-check'));
+}
+
+function copyOutput() {
+  const val = outputEditor ? outputEditor.getValue() : '';
+  if (!val) return showToast('Nothing to copy.', 'error', 'fa-times');
+  navigator.clipboard.writeText(val).then(() => showToast('Output copied!', 'success', 'fa-check'));
+}
+
+function clearAll() {
+  if (inputEditor) inputEditor.setValue('');
+  if (outputEditor) { outputEditor.updateOptions({readOnly:false}); outputEditor.setValue(''); outputEditor.updateOptions({readOnly:true}); }
+  setStatus('Ready', 'success');
+  showToast('Editors cleared.', 'info', 'fa-trash');
+}
+
+function loadSample() {
+  const from = document.getElementById('from-lang').value;
+  const samples = {
+    python: `def fibonacci(n):\n    """Return the nth Fibonacci number."""\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n\nfor i in range(10):\n    print(f"fib({i}) = {fibonacci(i)}")`,
+    javascript: `function fibonacci(n) {\n  // Return the nth Fibonacci number\n  if (n <= 1) return n;\n  let a = 0, b = 1;\n  for (let i = 2; i <= n; i++) {\n    [a, b] = [b, a + b];\n  }\n  return b;\n}\n\nfor (let i = 0; i < 10; i++) {\n  console.log(\`fib(\${i}) = \${fibonacci(i)}\`);\n}`,
+    java: `public class Fibonacci {\n    public static int fibonacci(int n) {\n        if (n <= 1) return n;\n        int a = 0, b = 1;\n        for (int i = 2; i <= n; i++) {\n            int temp = a + b;\n            a = b;\n            b = temp;\n        }\n        return b;\n    }\n    public static void main(String[] args) {\n        for (int i = 0; i < 10; i++) {\n            System.out.printf("fib(%d) = %d%n", i, fibonacci(i));\n        }\n    }\n}`,
+    cpp: `#include <iostream>\nusing namespace std;\n\nint fibonacci(int n) {\n    if (n <= 1) return n;\n    int a = 0, b = 1;\n    for (int i = 2; i <= n; i++) {\n        int temp = a + b;\n        a = b; b = temp;\n    }\n    return b;\n}\n\nint main() {\n    for (int i = 0; i < 10; i++)\n        cout << "fib(" << i << ") = " << fibonacci(i) << endl;\n    return 0;\n}`,
+  };
+  const sample = samples[from] || samples.python;
+  if (inputEditor) inputEditor.setValue(sample);
+  showToast('Sample code loaded!', 'info', 'fa-file-code');
+}
+
+function downloadOutput() {
+  const val = outputEditor ? outputEditor.getValue() : '';
+  if (!val) return showToast('Nothing to download.', 'error', 'fa-times');
+  const lang = document.getElementById('to-lang').value;
+  const ext = {python:'py',javascript:'js',typescript:'ts',java:'java',cpp:'cpp',c:'c',csharp:'cs',go:'go',rust:'rs',ruby:'rb',php:'php',swift:'swift',kotlin:'kt',html:'html',css:'css',sql:'sql',bash:'sh'}[lang] || 'txt';
+  const blob = new Blob([val], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `converted.${ext}`;
+  a.click();
+  showToast('File downloaded!', 'success', 'fa-download');
+}
+
+// ── HISTORY ────────────────────────────────────────────────
+function showHistory() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '';
+  if (!history.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text2);padding:2rem;font-size:0.875rem;">No conversions yet!</div>';
+  } else {
+    history.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'history-item';
+      el.innerHTML = `
+        <div>
+          <div class="history-langs">${item.from} → ${item.to}</div>
+          <div class="history-preview">${item.input.replace(/</g,'&lt;')}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div class="history-time">${item.time}</div>
+          <div class="history-time">${item.lines} lines</div>
+        </div>`;
+      el.onclick = () => {
+        if (inputEditor) inputEditor.setValue(item.input);
+        if (outputEditor) { outputEditor.updateOptions({readOnly:false}); outputEditor.setValue(item.output); outputEditor.updateOptions({readOnly:true}); }
+        closeHistory();
+        showToast('History item loaded.', 'info', 'fa-history');
+      };
+      list.appendChild(el);
+    });
+  }
+  document.getElementById('history-modal').classList.add('active');
+}
+function closeHistory() { document.getElementById('history-modal').classList.remove('active'); }
+
+// ── TOAST ──────────────────────────────────────────────────
+function showToast(msg, type='info', icon='fa-info-circle') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<i class="fas ${icon} toast-icon"></i><span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(120%)'; t.style.transition='all 0.4s'; setTimeout(() => t.remove(), 400); }, 3000);
+}
+
+// ── THEME ──────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  if (monacoReady) {
+    monaco.editor.setTheme(isDark ? 'vs' : 'vs-dark');
+  }
+  localStorage.setItem('codeshift_theme', isDark ? 'light' : 'dark');
+}
+
+// ── AUTH ───────────────────────────────────────────────────
+function loginWithGoogle() {
+  showToast('Connecting to Google…', 'info', 'fa-google');
+  setTimeout(() => {
+    currentUser = { name: 'User', email: 'user@gmail.com', avatar: 'U' };
+    showDashboard();
+    showToast('Welcome! Signed in with Google.', 'success', 'fa-check-circle');
+  }, 1200);
+}
+
+function loginDemo() {
+  currentUser = { name: 'Demo User', email: 'demo@codeshift.ai', avatar: 'D' };
+  showDashboard();
+  showToast('Welcome! Running in demo mode.', 'info', 'fa-play-circle');
+}
+
+function showDashboard() {
+  document.getElementById('login-page').classList.remove('active');
+  document.getElementById('dashboard-page').classList.add('active');
+  const av = document.getElementById('user-avatar');
+  av.textContent = currentUser.avatar;
+  av.title = currentUser.email;
+  populateSelects();
+  initMonaco();
+}
+
+function logout() {
+  currentUser = null;
+  document.getElementById('dashboard-page').classList.remove('active');
+  document.getElementById('login-page').classList.add('active');
+  if (inputEditor) { inputEditor.dispose(); inputEditor = null; }
+  if (outputEditor) { outputEditor.dispose(); outputEditor = null; }
+  monacoReady = false;
+  showToast('Logged out successfully.', 'info', 'fa-sign-out-alt');
+}
+
+// ── PARTICLES ──────────────────────────────────────────────
+function spawnParticles() {
+  const colors = ['rgba(59,130,246,0.5)','rgba(139,92,246,0.5)','rgba(6,182,212,0.4)'];
+  for (let i = 0; i < 18; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 4 + 2;
+    p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;background:${colors[Math.floor(Math.random()*colors.length)]};animation-duration:${Math.random()*15+10}s;animation-delay:${Math.random()*10}s;`;
+    document.body.appendChild(p);
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────
+(function init() {
+  const saved = localStorage.getItem('codeshift_theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  spawnParticles();
+
+  document.getElementById('history-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeHistory();
+  });
+})();
+</script>
+</body>
+</html>
